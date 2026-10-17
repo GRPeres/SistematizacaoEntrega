@@ -20,6 +20,7 @@ def test_cria_e_lista_cafe(client):
     response = client.post("/cafes", json={"nome": "Bourbon Amarelo", "preco": "21.90"})
     assert response.status_code == 201
     assert response.json()["nome"] == "Bourbon Amarelo"
+    assert response.json()["origem"] == "Não informada"
     assert len(client.get("/cafes").json()) == 1
 
 
