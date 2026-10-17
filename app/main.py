@@ -17,7 +17,7 @@ app = FastAPI(title="Café com Deploy", version="1.0.0")
 
 def preco_com_desconto(preco: float, pct: float) -> float:
     """Aplica desconto dentro do limite; lança ValueError quando inválido."""
-    maximo = float(os.getenv("DESCONTO_MAXIMO", "50"))
+    maximo = 100.0  # Bug proposital: somente para demonstrar o bloqueio do CI.
     if not (math.isfinite(preco) and preco >= 0):
         raise ValueError("preço inválido")
     if not (math.isfinite(pct) and 0 <= pct <= maximo):
@@ -77,3 +77,4 @@ def consultar_preco(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"id": cafe.id, "nome": cafe.nome, "desconto": desconto, "preco_final": preco}
+
