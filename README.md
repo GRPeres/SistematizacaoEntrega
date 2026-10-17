@@ -10,9 +10,9 @@
 | Item | Link |
 |---|---|
 | Repositório público | `https://github.com/GRPeres/SistematizacaoEntrega` |
-| Staging | [API staging](https://carl-wait-cingular-holder.trycloudflare.com) |
-| Produção | [API produção](https://fonts-sacramento-nations-reflection.trycloudflare.com) |
-| Release v1.0.0 | **PREENCHER:** `https://github.com/.../releases/tag/v1.0.0` |
+| Staging | [API staging](https://occasional-adjust-clause-issued.trycloudflare.com) |
+| Produção | [API produção](https://lady-valuation-discuss-finals.trycloudflare.com) |
+| Release v1.0.0 | [v1.0.0](https://github.com/GRPeres/SistematizacaoEntrega/releases/tag/v1.0.0) |
 | Game Day (vídeo) | **PREENCHER:** URL pública/não listada (o vídeo é opcional no início do enunciado, porém há 5% associados na rubrica) |
 
 ## 1. Diagrama do pipeline
@@ -102,8 +102,8 @@ Princípios aplicados: automação, feedback rápido, rastreabilidade do commit 
 
 A pirâmide tem **testes unitários** da regra `preco_com_desconto`, **testes de integração** API + banco SQLAlchemy (Postgres no Actions; SQLite em memória local) e **smoke tests** de `/health` e `/version` após cada deploy.
 
-- **Quantidade preparada:** 28 testes coletados localmente (12 de regras, 11 de API e 5 do gate de implantação).
-- **Evidência local inicial:** 28 passaram e 96% de cobertura da aplicação. Esse resultado não comprova o comportamento do PostgreSQL remoto.
+- **Quantidade preparada:** 29 testes coletados localmente (12 de regras, 11 de API, 5 do gate de implantação e 1 de evolução real por Alembic).
+- **Evidência local inicial:** 29 passaram e 96% de cobertura da aplicação. Esse resultado não comprova o comportamento do PostgreSQL remoto.
 - **Quality gate:** `pytest --cov=app --cov-fail-under=70`, lint Ruff e auditoria `pip-audit -r requirements.txt` em cada PR.
 - **Evidência final a preencher:** link do Actions CI com testes PostgreSQL verdes + relatório de cobertura no próprio log.
 
@@ -115,19 +115,13 @@ Para demonstrar o **erro barrado**, abra PR **temporária** que altera a valida�
 |---|---|---|---|
 | `0001_create_cafes` | `migrations/versions/` | 1º deploy | Cria `cafes` |
 | `0002_seed_cafes` | `migrations/versions/` | 1º deploy | Insere 5 cafés e ajusta sequência no Postgres |
-| `0003_add_origem` | `extras/migration3/` | **Depois da primeira produção** | Adiciona coluna opcional `origem`, preservando preços e linhas |
+| `0003_add_origem` | `migrations/versions/` | Ativada em PR após a primeira produção | Adiciona coluna opcional `origem`, preservando preços e linhas |
 
-**Muito importante:** o enunciado exige que a Migration 3 seja **criada depois do primeiro deploy em produção**. Por isso ela está propositalmente fora da pasta ativa. Depois de gravar evidência da `v1.0.0` em produção, crie branch e ative a terceira migration:
+A migration `0003` foi ativada após o [primeiro deploy automatizado em produção](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39077694982) e a [demonstração de rollback](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39078078308). A Release v1.0.0 permanece como versão inicial, sem a terceira migration.
 
-```bash
-git switch -c feat/origem-cafe
-python scripts/ativar_migration3.py
-# confira se migrations/versions/0003_add_origem.py foi criada
-git add migrations/versions/0003_add_origem.py
-git commit -m "feat: adiciona migration de origem sem perder dados"
-git push -u origin feat/origem-cafe
-# abra PR, espere CI, merge na main e registre novo deploy
-```
+O PR adiciona `origem` ao modelo e à resposta da API, com padrão `Não informada`. O teste de evolução executa `0001`/`0002`, insere um registro adicional, captura IDs/nomes/preços, aplica `0003` e compara os dados anteriores. Também verifica o padrão em novas inserções e a execução repetida de `upgrade head`. Localmente usa SQLite descartável; no CI cria um banco PostgreSQL exclusivo para o teste e o remove ao terminar.
+
+A aplicação aplica `alembic upgrade head` antes de iniciar. Após o merge, validar `/cafes` em staging e confirmar que os registros anteriores mantêm IDs, nomes e preços, agora com `origem`. Somente então aprovar produção e repetir a comparação. O sucesso ponta a ponta deve ser registrado após essa execução.
 
 **Expandir e contrair:** a mudança primeiro **expande** o esquema com coluna opcional e padrão, sem excluir a coluna existente e sem alterar os dados de `nome`/`preco`. Uma mudança futura de remoção/contração exigiria período de compatibilidade e migração dos dados. O rollback de aplicação **não executa `alembic downgrade`**.
 
@@ -227,6 +221,7 @@ O script `python scripts/dora.py USUARIO/REPO` lê histórico real de execuçõe
 - [Twelve-Factor App](https://12factor.net/pt_br/).
 - [Documentação GitHub Actions](https://docs.github.com/pt/actions).
 - [DORA Software Delivery Metrics](https://dora.dev/).
+
 
 
 

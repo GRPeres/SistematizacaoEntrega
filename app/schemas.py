@@ -14,3 +14,4 @@ class CafeOut(CafeCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    origem: str | None = None
