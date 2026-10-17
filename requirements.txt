@@ -4,4 +4,4 @@ uvicorn[standard]==0.48.0
 sqlalchemy==2.0.50
 alembic==1.18.4
 psycopg[binary]==3.3.6
-pydantic==2.13.5
+pydantic==2.14.1
