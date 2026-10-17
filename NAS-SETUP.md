@@ -78,3 +78,13 @@ Um build verde não comprova essas etapas.
 
 Fontes: [TrueNAS Custom Apps](https://apps.truenas.com/managing-apps/installing-custom-apps/),
 [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+
+## Verificação dos ambientes em 17/10/2026
+
+- Staging: https://carl-wait-cingular-holder.trycloudflare.com
+- Produção: https://fonts-sacramento-nations-reflection.trycloudflare.com
+- Ambos responderam HTTP 200 em `/health`, `/version` e `/cafes` (cinco cafés).
+- Versão reportada por ambos: `abc12a0c08466102be2451a492b6b7bf71bf669f`.
+- As variáveis `APP_URL` foram registradas nos GitHub Environments correspondentes.
+- Esta verificação comprova disponibilidade e versão, mas não confirma isolamento
+  dos volumes/bancos nem execução automatizada do deploy pelo GitHub Actions.

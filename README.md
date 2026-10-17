@@ -2,7 +2,7 @@
 
 > **Projeto acadêmico — Pós-graduação CEUB, Integração e Entrega Contínuas.**
 > Este repositório contém a implementação e a preparação de infraestrutura. Resultados de implantação só serão registrados após execução real.
-> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). O build no GHCR funciona independentemente do deploy; as etapas antigas do Render ficam desabilitadas. URLs, aprovação e automação do NAS ainda estão pendentes.
+> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). O build no GHCR funciona independentemente do deploy; as etapas antigas do Render ficam desabilitadas. Staging e produção foram implantados manualmente no NAS e verificados em 17/10/2026. A automação de deploy e rollback no NAS ainda está pendente.
 
 ![CI](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/ci.yml/badge.svg)
 ![CD](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/cd.yml/badge.svg)
@@ -10,8 +10,8 @@
 | Item | Link |
 |---|---|
 | Repositório público | `https://github.com/GRPeres/SistematizacaoEntrega` |
-| Staging | **PREENCHER:** URL pública do túnel TrueNAS |
-| Produção | **PREENCHER:** URL pública do túnel TrueNAS |
+| Staging | [API staging](https://carl-wait-cingular-holder.trycloudflare.com) |
+| Produção | [API produção](https://fonts-sacramento-nations-reflection.trycloudflare.com) |
 | Release v1.0.0 | **PREENCHER:** `https://github.com/.../releases/tag/v1.0.0` |
 | Game Day (vídeo) | **PREENCHER:** URL pública/não listada (o vídeo é opcional no início do enunciado, porém há 5% associados na rubrica) |
 
@@ -227,5 +227,6 @@ O script `python scripts/dora.py USUARIO/REPO` lê histórico real de execuçõe
 - [Twelve-Factor App](https://12factor.net/pt_br/).
 - [Documentação GitHub Actions](https://docs.github.com/pt/actions).
 - [DORA Software Delivery Metrics](https://dora.dev/).
+
 
 
