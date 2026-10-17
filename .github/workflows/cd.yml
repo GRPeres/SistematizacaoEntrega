@@ -28,7 +28,7 @@ jobs:
       image_ref: ${{ steps.artefato.outputs.image_ref }}
       image_tag: ${{ steps.meta.outputs.image_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Preparar referência da imagem
         id: meta
         shell: bash
