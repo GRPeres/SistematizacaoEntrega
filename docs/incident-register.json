@@ -1,0 +1,6 @@
+{
+  "scope": "Incidentes registrados nos deploys automatizados deste projeto acadêmico",
+  "incidents": [],
+  "rollback_drill_run_ids": [39078078308],
+  "note": "O rollback foi um exercício controlado. Falhas em PRs e instalação manual inicial não são falhas de mudanças produtivas automatizadas."
+}

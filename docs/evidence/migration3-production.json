@@ -1,0 +1,68 @@
+{
+  "environment": "production",
+  "verified_at_utc": "2026-10-17T23:37:09.895676+00:00",
+  "url": "https://lady-valuation-discuss-finals.trycloudflare.com",
+  "before_version": "abc12a0c08466102be2451a492b6b7bf71bf669f",
+  "after_version": "00718a2d6799ff580a808ccc464c80b62c745d86",
+  "before": [
+    {
+      "nome": "Cerrado Mineiro",
+      "preco": "16.90",
+      "id": 1
+    },
+    {
+      "nome": "Chapada Diamantina",
+      "preco": "19.90",
+      "id": 2
+    },
+    {
+      "nome": "Mogiana",
+      "preco": "15.50",
+      "id": 3
+    },
+    {
+      "nome": "Sul de Minas",
+      "preco": "17.00",
+      "id": 4
+    },
+    {
+      "nome": "Mantiqueira",
+      "preco": "23.00",
+      "id": 5
+    }
+  ],
+  "after": [
+    {
+      "nome": "Cerrado Mineiro",
+      "preco": "16.90",
+      "id": 1,
+      "origem": "Não informada"
+    },
+    {
+      "nome": "Chapada Diamantina",
+      "preco": "19.90",
+      "id": 2,
+      "origem": "Não informada"
+    },
+    {
+      "nome": "Mogiana",
+      "preco": "15.50",
+      "id": 3,
+      "origem": "Não informada"
+    },
+    {
+      "nome": "Sul de Minas",
+      "preco": "17.00",
+      "id": 4,
+      "origem": "Não informada"
+    },
+    {
+      "nome": "Mantiqueira",
+      "preco": "23.00",
+      "id": 5,
+      "origem": "Não informada"
+    }
+  ],
+  "existing_ids_names_prices_preserved": true,
+  "new_origin_default_verified": true
+}
