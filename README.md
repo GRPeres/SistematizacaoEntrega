@@ -2,7 +2,7 @@
 
 > **Projeto acadêmico — Pós-graduação CEUB, Integração e Entrega Contínuas.**
 > Este repositório contém a implementação e a preparação de infraestrutura. Resultados de implantação só serão registrados após execução real.
-> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). O build no GHCR funciona independentemente do deploy; as etapas antigas do Render ficam desabilitadas. URLs, aprovação e automação do NAS ainda estão pendentes.
+> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). Staging e produção foram verificados em 17/10/2026. O pipeline Watchtower está implementado; sua ativação e validação ponta a ponta seguem [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md).
 
 ![CI](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/ci.yml/badge.svg)
 ![CD](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/cd.yml/badge.svg)
@@ -10,8 +10,8 @@
 | Item | Link |
 |---|---|
 | Repositório público | `https://github.com/GRPeres/SistematizacaoEntrega` |
-| Staging | **PREENCHER:** `https://...onrender.com` |
-| Produção | **PREENCHER:** `https://...onrender.com` |
+| Staging | [API staging](https://carl-wait-cingular-holder.trycloudflare.com) |
+| Produção | [API produção](https://fonts-sacramento-nations-reflection.trycloudflare.com) |
 | Release v1.0.0 | **PREENCHER:** `https://github.com/.../releases/tag/v1.0.0` |
 | Game Day (vídeo) | **PREENCHER:** URL pública/não listada (o vídeo é opcional no início do enunciado, porém há 5% associados na rubrica) |
 
@@ -102,8 +102,8 @@ Princípios aplicados: automação, feedback rápido, rastreabilidade do commit 
 
 A pirâmide tem **testes unitários** da regra `preco_com_desconto`, **testes de integração** API + banco SQLAlchemy (Postgres no Actions; SQLite em memória local) e **smoke tests** de `/health` e `/version` após cada deploy.
 
-- **Quantidade preparada:** 23 testes coletados localmente (12 unitários parametrizados e 11 testes de API; alguns testes de API cobrem dois endpoints).
-- **Evidência local inicial:** 23 passaram e 96% de cobertura. Esse resultado não comprova o comportamento do PostgreSQL remoto.
+- **Quantidade preparada:** 28 testes coletados localmente (12 de regras, 11 de API e 5 do gate de implantação).
+- **Evidência local inicial:** 28 passaram e 96% de cobertura da aplicação. Esse resultado não comprova o comportamento do PostgreSQL remoto.
 - **Quality gate:** `pytest --cov=app --cov-fail-under=70`, lint Ruff e auditoria `pip-audit -r requirements.txt` em cada PR.
 - **Evidência final a preencher:** link do Actions CI com testes PostgreSQL verdes + relatório de cobertura no próprio log.
 
@@ -135,26 +135,14 @@ git push -u origin feat/origem-cafe
 
 ## 5. Infraestrutura e ambientes
 
-- `Dockerfile` multi-stage (`deps`/`runtime`), Python 3.12, usuário não-root `appuser`, endpoint health e variável `PORT`.
-- `docker-compose.yml` inicia Postgres 16 local, com persistência e healthcheck.
-- Repositório público e imagem pública no GHCR (necessário se o Render acessa a imagem sem autenticação).
-- Render `staging`: serviço a partir de **Existing Image**, apontado para `ghcr.io/GRPeres/SistematizacaoEntrega:<SHA>` + banco próprio.
-- Render `production`: outro serviço **Existing Image**, mesmo pacote, banco próprio.
+- `Dockerfile` multi-stage, Python 3.12 e usuário não-root.
+- `docker-compose.yml`: ambiente local. `compose.nas.yml`: imagem GHCR por digest, banco persistente e portas locais 8001/8002.
+- TrueNAS SCALE: dois apps separados, `cafe-staging` e `cafe-production`, com PostgreSQL, credenciais e volumes distintos.
+- `deploy/truenas-quick.yml`: modelo para instalar cada app pela interface TrueNAS com hostname gratuito temporário do Cloudflare.
 
-### Configuração manual obrigatória (pelo titular das contas)
+**Ativação:** [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md). CD promove o digest do build para `:staging`, verifica a versão pública, solicita aprovação e promove o mesmo digest para `:production`. Watchtower aplica as tags em instâncias com escopos separados. `WATCHTOWER_ENABLED=true` habilita a promoção; até a instalação no NAS e uma execução completa, não há evidência ponta a ponta. A imagem usa nome minúsculo: `ghcr.io/grperes/sistematizacaoentrega`.
 
-1. No GitHub, crie repositório **público** `cafe-com-deploy-NOME_DA_EQUIPE`. Envie os arquivos via branch `feat/estrutura-inicial`, usando PR.
-2. Em **Settings > Rules > Rulesets** (ou **Branches**), exija PR e o check de CI `qualidade` após seu primeiro run. Se em equipe, configure 1 aprovação de revisão. Para pessoa sozinha, PR obrigatório com 0 aprovações, se permitido pela regra/plano.
-3. Em **Settings > Environments**, crie `staging` e `production`. Configure secret **`RENDER_DEPLOY_HOOK`** em cada um e variável **`APP_URL`** com URL pública da API correspondente. Em `production`, ative **Required reviewers** para aprovação humana.
-4. Crie **dois bancos PostgreSQL** separados em provedor compatível (Neon, Supabase etc.). Configure `DATABASE_URL=postgresql+psycopg://...` em cada serviço de hospedagem. Nunca versionar credenciais.
-5. Faça primeiro merge na `main`: o workflow CD validará, construirá a imagem e fará push ao GHCR. Em GitHub **Packages**, mude a visibilidade do container para **public** para o Render conseguir baixar.
-6. Crie os dois serviços Render usando o nome exato do repositório/imagem GHCR. Copie o deploy hook de cada serviço. Se a execução anterior parou por falta de hook/ambiente, faça novo merge de PR pequena para rodar CD novamente.
-7. Em **Render > Settings**, copie e salve cada deploy hook no GitHub Environment correspondente. O CD passa a acionar o hook com `imgURL=` do **mesmo digest imutável**. A base da imagem configurada no Render deve ser **idêntica** à usada no hook.
-8. Espere os smoke tests em staging; aprove manualmente o job de `production` no GitHub Actions; verifique `/health`, `/version` e `/cafes` nos dois endereços.
-
-O Render pode suspender instâncias gratuitas inativas, por isso o CD faz tentativas repetidas. Restrições de plano e disponibilidades de serviços gratuitos podem mudar; confirme a oferta na contratação.
-
-**Fontes técnicas úteis:** [Render Deploy Hooks](https://render.com/docs/deploy-hooks), [Render image-backed services](https://render.com/docs/deploying-an-image), [GitHub Environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+No GitHub, exigir PR e check `qualidade` na main; criar Environments `staging` e `production`, configurar a variável `APP_URL` de cada ambiente e exigir aprovação humana de produção. Esses requisitos devem ser comprovados com execuções reais antes da entrega. A imagem de produção deve usar o mesmo digest aprovado em staging.
 
 ## 6. Dependências e segurança
 
@@ -162,7 +150,7 @@ O Render pode suspender instâncias gratuitas inativas, por isso o CD faz tentat
 - `.github/dependabot.yml` abre PRs semanais para `pip`, `github-actions` e `docker`.
 - `pip-audit` roda no CI. Uma vulnerabilidade detectada **deve bloquear o fluxo**; resolva atualizando/avaliando a dependência em PR, não escondendo o erro.
 - Permissões por padrão `contents: read`; somente o job que publica no GHCR recebe `packages: write`.
-- Os secrets dos hooks ficam restritos aos GitHub Environments; nunca copie suas URLs para issues/README.
+- Senhas e tokens ficam em configuração privada; não copiar para issues, README ou Git.
 - **Evidência pendente:** link para um PR real do Dependabot tratado (mesclado com CI verde ou fechado com justificativa).
 
 ## 7. Gerência de releases, rollback e Game Day
@@ -239,4 +227,7 @@ O script `python scripts/dora.py USUARIO/REPO` lê histórico real de execuçõe
 - [Twelve-Factor App](https://12factor.net/pt_br/).
 - [Documentação GitHub Actions](https://docs.github.com/pt/actions).
 - [DORA Software Delivery Metrics](https://dora.dev/).
+
+
+
 

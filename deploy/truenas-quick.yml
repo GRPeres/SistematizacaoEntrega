@@ -1,0 +1,36 @@
+# Install once as cafe-staging, then separately as cafe-production.
+# Replace the image digest and BOTH password placeholders before installation.
+# Never commit the filled version.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cafe
+      POSTGRES_PASSWORD: REPLACE_WITH_RANDOM_PASSWORD
+      POSTGRES_DB: cafe
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U cafe -d cafe"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    image: ghcr.io/grperes/sistematizacaoentrega@sha256:REPLACE_WITH_IMAGE_DIGEST
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://cafe:REPLACE_WITH_RANDOM_PASSWORD@db:5432/cafe
+      DESCONTO_MAXIMO: "50"
+    depends_on:
+      db:
+        condition: service_healthy
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: [tunnel, --no-autoupdate, --url, "http://api:8000"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  pgdata:

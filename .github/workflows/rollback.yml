@@ -1,45 +1,49 @@
 name: rollback
-
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "SHA de 7 hexadecimais da última versão estável"
+        description: SHA of a previous known-good build (7 or 40 hex characters)
         required: true
         type: string
-
 permissions:
   contents: read
-
+  packages: write
+concurrency:
+  group: cafe-environments
+  cancel-in-progress: false
 jobs:
   rollback:
-    name: reimplantar-versao-estavel
-    if: ${{ vars.DEPLOY_TARGET == 'render' }}
+    if: ${{ github.ref == 'refs/heads/main' && vars.WATCHTOWER_ENABLED == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: production
+    timeout-minutes: 16
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
     steps:
-      - name: Validar SHA e acionar rollback
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve previous commit and published image digest
         env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
           TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          if ! [[ "$TAG" =~ ^[a-f0-9]{7}$ ]]; then
-            echo "TAG inválida - informe SHA curto hexadecimal"; exit 1
-          fi
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:$TAG"
-          curl --retry 3 -fsS -G "$HOOK" --data-urlencode "imgURL=$IMAGE"
-      - name: Validar recuperação do serviço e SHA antigo
+          [[ "$TAG" =~ ^([a-f0-9]{7}|[a-f0-9]{40})$ ]] || exit 1
+          SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)"
+          [[ "$SHA" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
+          DIGEST="$(docker buildx imagetools inspect "$NAME:${SHA::7}" --format '{{.Manifest.Digest}}')"
+          echo "EXPECTED_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "IMAGE=$NAME@$DIGEST" >> "$GITHUB_ENV"
+      - name: Restore the previous image without rebuilding
+        run: bash scripts/promote_image.sh "$IMAGE" production
+      - name: Verify recovery
         env:
           APP_URL: ${{ vars.APP_URL }}
-          TAG: ${{ inputs.tag }}
-        run: |
-          for i in $(seq 1 40); do
-            if curl -fsS --max-time 20 "$APP_URL/health" | grep -Fq '"ok"' \
-              && curl -fsS --max-time 20 "$APP_URL/version" | grep -Fq "$TAG"; then
-              echo "Rollback verificado: $TAG"; exit 0
-            fi
-            sleep 15
-          done
-          echo "Rollback não validado"; exit 1
+        run: python scripts/wait_for_deployment.py

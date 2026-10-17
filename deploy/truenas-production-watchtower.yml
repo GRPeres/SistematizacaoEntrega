@@ -1,0 +1,49 @@
+# App: cafe-production. Keep your EXISTING database password in BOTH places.
+# First run prepare-watchtower in GitHub and scope the MangaHub Watchtower to none.
+# Never commit the filled version.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cafe
+      POSTGRES_PASSWORD: REPLACE_WITH_RANDOM_PASSWORD
+      POSTGRES_DB: cafe
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U cafe -d cafe"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    image: ghcr.io/grperes/sistematizacaoentrega:production
+    restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.scope: cafe-production
+    environment:
+      DATABASE_URL: postgresql+psycopg://cafe:REPLACE_WITH_RANDOM_PASSWORD@db:5432/cafe
+      DESCONTO_MAXIMO: "50"
+    depends_on:
+      db:
+        condition: service_healthy
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: [tunnel, --no-autoupdate, --url, "http://api:8000"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    command: [--label-enable, --scope, cafe-production, --interval, "30", --rolling-restart, --stop-timeout, 30s]
+    labels:
+      com.centurylinklabs.watchtower.scope: cafe-production
+      com.centurylinklabs.watchtower.enable: "false"
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+volumes:
+  pgdata:
+
