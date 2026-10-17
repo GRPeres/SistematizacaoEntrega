@@ -25,3 +25,10 @@ def test_desconto_invalido(desconto):
 def test_preco_invalido(preco):
     with pytest.raises(ValueError, match="preço inválido"):
         preco_com_desconto(preco, 10)
+
+
+def test_desconto_respeita_limite_configurado(monkeypatch):
+    monkeypatch.setenv("DESCONTO_MAXIMO", "25")
+    assert preco_com_desconto(10, 25) == 7.5
+    with pytest.raises(ValueError, match="desconto inválido"):
+        preco_com_desconto(10, 26)

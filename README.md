@@ -1,228 +1,173 @@
-# ☕ Café com Deploy — CI/CD sem medo da sexta-feira
-
-> **Projeto acadêmico — Pós-graduação CEUB, Integração e Entrega Contínuas.**
-> Este repositório contém a implementação e a preparação de infraestrutura. Resultados de implantação só serão registrados após execução real.
-> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). Staging e produção foram verificados em 17/10/2026. O pipeline Watchtower está implementado; sua ativação e validação ponta a ponta seguem [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md).
+# ☕ Café com Deploy — Relatório de Voo
 
 ![CI](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/ci.yml/badge.svg)
 ![CD](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/cd.yml/badge.svg)
 
-| Item | Link |
+**Equipe e integrante:** Gabriel Ribeiro Peres · matrícula **82602166** · GitHub **GRPeres** · trabalho individual.
+
+| Entrega | Link |
 |---|---|
-| Repositório público | `https://github.com/GRPeres/SistematizacaoEntrega` |
-| Staging | [API staging](https://occasional-adjust-clause-issued.trycloudflare.com) |
-| Produção | [API produção](https://lady-valuation-discuss-finals.trycloudflare.com) |
-| Release v1.0.0 | [v1.0.0](https://github.com/GRPeres/SistematizacaoEntrega/releases/tag/v1.0.0) |
-| Game Day (vídeo) | **PREENCHER:** URL pública/não listada (o vídeo é opcional no início do enunciado, porém há 5% associados na rubrica) |
+| Repositório público | [GRPeres/SistematizacaoEntrega](https://github.com/GRPeres/SistematizacaoEntrega) |
+| Staging | [Documentação interativa](https://occasional-adjust-clause-issued.trycloudflare.com/docs) · [versão](https://occasional-adjust-clause-issued.trycloudflare.com/version) |
+| Produção | [Documentação interativa](https://lady-valuation-discuss-finals.trycloudflare.com/docs) · [versão](https://lady-valuation-discuss-finals.trycloudflare.com/version) |
+| Release inicial | [v1.0.0](https://github.com/GRPeres/SistematizacaoEntrega/releases/tag/v1.0.0) |
+| Vídeo Game Day | Não gravado nesta revisão; o link será acrescentado se o vídeo for produzido. |
+
+Staging e produção estão no TrueNAS SCALE, com PostgreSQL e configurações separados. Os hostnames gratuitos do Cloudflare podem mudar quando os túneis são recriados; nesse caso, é necessário atualizar estes links e as variáveis `APP_URL` dos GitHub Environments. A API não define `/`: use `/docs`, `/health`, `/version` ou `/cafes`.
 
 ## 1. Diagrama do pipeline
 
 ```mermaid
 flowchart LR
-    A[Branch curta + PR] --> B[CI: lint + testes + cobertura + pip-audit]
-    B -->|Aprovado e merge na main| C[CI reutilizado]
-    C --> D[Build Docker uma vez]
-    D --> E[GHCR: SHA e digest imutável]
-    E --> F[Staging]
-    F --> G{Smoke tests passam?}
-    G -->|Sim| H{Aprovação manual}
-    G -->|Não| X[Interromper linha]
-    H -->|Aprovado| I[Produção: mesmo digest]
-    H -->|Rejeitado| X
-    I --> J[Smoke tests]
-    J -->|Falha| K[Rollback manual: imagem estável]
-    J -->|Sucesso| L[Release / monitoramento]
+    A[Branch curta e PR] --> B[CI: lint, testes, cobertura e auditoria]
+    B -->|Falha: merge bloqueado| X[Corrigir no mesmo PR]
+    X --> B
+    B -->|Sucesso e merge| C[Build único e push no GHCR]
+    C --> D[Promover digest para tag staging]
+    D --> E[Watchtower atualiza staging]
+    E --> F[Smoke: saúde, SHA exato e cardápio]
+    F -->|Sucesso| G{Aprovação humana}
+    G --> H[Mesmo digest na tag production]
+    H --> I[Watchtower atualiza produção]
+    I --> J[Smoke tests produtivos]
+    J --> K[Histórico verificável]
+    R[Workflow manual de rollback] --> G
 ```
 
-**Regras essenciais:** toda PR precisa passar pelo quality gate; nenhuma imagem é reconstruída entre staging e produção; configuração fica em variáveis e secrets; migrations são versionadas; um deploy com teste vermelho não prossegue.
+O artefato é identificado pelo SHA e pelo digest. As tags móveis `staging` e `production` apontam para esse mesmo artefato; não há novo build na promoção. Actions verifica o digest publicado e aguarda o SHA esperado na API. CD e rollback compartilham um grupo de concorrência para evitar alterações simultâneas nos canais.
 
-## Como executar localmente
+**Evidência:** [primeiro deploy automatizado completo](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39077694982), com CI, build, staging, aprovação e produção concluídos; [implantação da migration 3](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39079320715).
 
-**Pré-requisitos:** Git, Docker + Docker Compose (ou Python 3.12 e um PostgreSQL).
+## 2. Diagnóstico: antipadrões eliminados
 
-```bash
-# inicia Postgres e API; aplica migrations 0001 e 0002 automaticamente
-docker compose up --build
-
-# Em outro terminal:
-curl http://localhost:8000/health
-curl http://localhost:8000/version
-curl http://localhost:8000/cafes
-curl "http://localhost:8000/cafes/1/preco?desconto=10"
-# Swagger: http://localhost:8000/docs
-```
-
-Sem Docker, para testar rapidamente após instalar as dependências:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
-python -m pip install -r requirements-dev.txt
-pytest --cov=app --cov-report=term-missing --cov-fail-under=70
-ruff check .
-```
-
-Os testes usam SQLite em memória **somente quando** `TEST_DATABASE_URL` não está definido. O CI executa os mesmos testes de integração com PostgreSQL em um **service container exclusivo**, jamais com o banco de produção.
-
-### Endpoints implementados
-
-| Método | Endpoint | Comportamento |
-|---|---|---|
-| GET | `/health` | `{"status":"ok"}` |
-| GET | `/version` | SHA da imagem, via `APP_VERSION` |
-| GET | `/cafes` | Lista do cardápio |
-| POST | `/cafes` | Adiciona café; 409 para nomes repetidos |
-| GET | `/cafes/{id}` | Café ou 404 |
-| GET | `/cafes/{id}/preco?desconto=10` | Preço com desconto de 0 a 50%, ou 422 |
-
-Exemplo de novo café:
-
-```bash
-curl -X POST http://localhost:8000/cafes \
-  -H 'Content-Type: application/json' \
-  -d '{"nome":"Bourbon Amarelo","preco":"21.90"}'
-```
-
-## 2. Diagnóstico da crise e correções
-
-| Antipadrão observado | Solução implementada |
+| Crise original | Decisão e efeito |
 |---|---|
-| FTP e deploy manual sem histórico | CD automático após merge; GHCR com SHA/digest |
-| Um `ALTER TABLE` manual em produção | Alembic em cada inicialização/implantação (demonstração) |
-| Preços alterados sem testes | Testes unitários + integração de API + coverage gate |
-| Configuração/segredo no código | `.env.example`, `.gitignore`, GitHub Environment secrets |
-| Sem ambiente similar à produção | Mesmo Dockerfile e mesmo digest, com variáveis isoladas |
-| Não se sabia qual versão estava no ar | `/version`, label OCI revision e imagem com SHA |
-| Sem recuperação documentada | Workflow manual de rollback com smoke test |
-| Dependências sem controle | `requirements*.txt` fixados, Dependabot e pip-audit |
+| Copiar arquivos por FTP sem histórico | Código, Dockerfile, migrations e workflows no Git; mudanças por PR e Conventional Commits. |
+| Fazer ALTER TABLE manualmente | Alembic aplica migrations versionadas na inicialização, antes da API. |
+| Publicar preços incorretos sem validação | Testes de regras e API, cobertura mínima de 70%, lint e auditoria bloqueiam o merge. |
+| Ambientes diferentes | Mesma imagem promovida por digest, com bancos e configurações separados. |
+| Não saber qual versão está rodando | `/version` expõe o SHA; GHCR conserva a imagem selecionada. |
+| Dependências sem controle | Versões fixadas, Dependabot e pip-audit no CI. |
+| Recuperação improvisada | Workflow de rollback reponta o canal produtivo e verifica a versão restaurada. |
 
-Princípios aplicados: automação, feedback rápido, rastreabilidade do commit ao artefato, consistência de ambientes e princípio *stop the line* em caso de falha, conforme a fundamentação fornecida no trabalho.
+As decisões aplicam os princípios de Humble e Farley: automatizar o processo repetível, manter sua definição sob controle de versão e antecipar feedback. Configurações de ambiente ficam fora do código, conforme Twelve-Factor. A main exige PR e o check `qualidade`, inclusive para o administrador; como o trabalho é individual, a aprovação de revisão de PR pode ser zero. A aprovação do Environment de produção permanece obrigatória.
 
-## 3. Estratégia de testes
+## 3. Estratégia de testes e demonstração do quality gate
 
-A pirâmide tem **testes unitários** da regra `preco_com_desconto`, **testes de integração** API + banco SQLAlchemy (Postgres no Actions; SQLite em memória local) e **smoke tests** de `/health` e `/version` após cada deploy.
+| Camada/objetivo | Quantidade na revisão atual |
+|---|---:|
+| Unitários da regra de desconto | 13 |
+| Integração API e banco | 11 |
+| Evolução real do banco de 0002 para 0003 | 1 |
+| Validação dos resultados de smoke tests | 5 |
+| Seleção correta de deploys nas métricas | 3 |
+| **Total pytest** | **33** |
 
-- **Quantidade preparada:** 29 testes coletados localmente (12 de regras, 11 de API, 5 do gate de implantação e 1 de evolução real por Alembic).
-- **Evidência local inicial:** 29 passaram e 96% de cobertura da aplicação. Esse resultado não comprova o comportamento do PostgreSQL remoto.
-- **Quality gate:** `pytest --cov=app --cov-fail-under=70`, lint Ruff e auditoria `pip-audit -r requirements.txt` em cada PR.
-- **Evidência final a preencher:** link do Actions CI com testes PostgreSQL verdes + relatório de cobertura no próprio log.
+Localmente os testes de API usam SQLite em memória; o teste de migration usa um arquivo descartável. No Actions, API e migrations usam PostgreSQL 16; a migration ganha um banco descartável próprio. Nunca são utilizados bancos de produção nos testes. A cobertura da aplicação é **96,47%**, acima do gate de 70%. O CI também executa `ruff check .` e `pip-audit -r requirements.txt`.
 
-Para demonstrar o **erro barrado**, abra PR **temporária** que altera a validação em `app/main.py` para aceitar 80% (ex.: alterar `DESCONTO_MAXIMO` para 100 apenas no branch). O teste `test_desconto_invalido` deve falhar, e a regra da `main` deve bloquear merge. Corrija, rode CI novamente e só então faça merge. **Não leve bug proposital para produção.**
+Os smoke tests reais, executados depois de cada promoção, verificam `/health`, o SHA completo em `/version` e pelo menos cinco cafés em `/cafes`. Eles não entram na contagem do pytest acima. A pirâmide concentra verificações de regras na base e mantém poucas verificações pela rede após o deploy.
 
-## 4. Gerência de dados e migrations
+### Erro barrado, correção e histórico
 
-| Migration | Onde | Quando aplicar | Propósito |
+No [PR #13](https://github.com/GRPeres/SistematizacaoEntrega/pull/13), o [commit propositalmente defeituoso](https://github.com/GRPeres/SistematizacaoEntrega/commit/8b2b9774c3011f0536037ff2377048ed9c1fb1e2) trocou o máximo configurável por 100%, aceitando descontos inválidos. O [CI vermelho](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39079696548) terminou com **3 falhas e 26 testes aprovados**: descontos de 51% e 80% não lançavam erro, e a rota retornava 200 em vez de 422. O PR ficou **BLOCKED**, conforme [registro do estado naquele momento](docs/evidence/ci-blocked.json). O código defeituoso não foi mesclado nem implantado.
+
+O [commit de correção](https://github.com/GRPeres/SistematizacaoEntrega/commit/14f224bb05522bef3bac4cebcd29844ee488517f) restaurou a configuração e acrescentou um teste para limite personalizado de 25%. A [execução corrigida passou](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39079775782), com 30 testes naquela etapa. A revisão final acrescenta os três testes de métricas, totalizando 33; [checks atuais do PR](https://github.com/GRPeres/SistematizacaoEntrega/pull/13/checks). A evidência distingue o histórico vermelho/verde da suíte final.
+
+## 4. Gerência de dados: três migrations
+
+| Revisão | Finalidade | Evidência |
+|---|---|---|
+| `0001` | Criação da tabela `cafes` | [Migration](migrations/versions/0001_create_cafes.py) |
+| `0002` | Seed de cinco cafés e ajuste da sequência PostgreSQL | [Migration](migrations/versions/0002_seed_cafes.py) |
+| `0003` | Coluna opcional `origem`, com padrão `Não informada` | [Migration](migrations/versions/0003_add_origem.py) · [PR #12](https://github.com/GRPeres/SistematizacaoEntrega/pull/12) |
+
+A migration 3 entrou na pasta ativa **depois do primeiro deploy produtivo**. A Release v1.0.0 preserva a versão inicial, anterior a essa evolução. O [deploy posterior](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39079320715) aplicou a terceira revisão automaticamente em staging e, após aprovação, em produção.
+
+O teste de migration cria o banco até 0002, insere um sexto café, captura IDs/nomes/preços, aplica 0003 e confirma que tudo permanece igual. Verifica também o padrão em novas inserções e que repetir `upgrade head` não duplica dados. A comparação dos ambientes reais preservou os **cinco cafés anteriores**, agora com `origem`: [staging antes/depois](docs/evidence/migration3-staging.json) e [produção antes/depois](docs/evidence/migration3-production.json).
+
+A evolução aplica a fase **expandir**: adiciona uma coluna sem remover ou renomear as anteriores. A fase **contrair**, caso necessária no futuro, só ocorreria após migração dos consumidores e dados. Rollback da aplicação não executa `alembic downgrade`. Embora o SQL antigo continue compatível com a coluna extra, imagens anteriores à revisão 0003 não conhecem essa revisão no startup do Alembic: **após essa migração, o alvo de rollback deve conter a revisão 0003; não usar a baseline `abc12a0`**.
+
+## 5. Métricas DORA com dados reais
+
+**Recorte fixado em 17/10/2026, às 20:39:22, horário de Brasília (UTC−3).** Os valores abaixo são uma fotografia para esta entrega, não um contador atualizado a cada acesso. Os dados e horários UTC estão em [dora-2026-10-17.json](docs/evidence/dora-2026-10-17.json).
+
+| Indicador | Resultado observado | Cálculo e limite |
+|---|---|---|
+| Frequência de deploy | **2 deploys progressivos e 1 rollback no dia observado** | Dois jobs produtivos concluídos com smoke tests; a reimplantação de recuperação é apresentada separadamente. |
+| Lead time médio | **2 h 03 min 55 s** | Média de 14.658 s e 212 s: `(14.658 + 212) / 2 = 7.435 s`. Do horário do commit de integração ao fim do smoke produtivo. |
+| Taxa de falha de mudanças | **0% registrado, 0/2 deploys progressivos** | Nenhum incidente produtivo registrado nesta amostra. Falhas em PRs e o rollback de exercício não entram como incidentes produtivos. |
+| Recuperação no exercício de rollback | **64 s (1 min 04 s)** | Da solicitação do workflow às 20:11:52 até a verificação da recuperação às 20:12:56; inclui espera/aprovação e execução. |
+
+| Deploy | Commit integrado, Brasília | Smoke produtivo concluído, Brasília | Lead time |
 |---|---|---|---|
-| `0001_create_cafes` | `migrations/versions/` | 1º deploy | Cria `cafes` |
-| `0002_seed_cafes` | `migrations/versions/` | 1º deploy | Insere 5 cafés e ajusta sequência no Postgres |
-| `0003_add_origem` | `migrations/versions/` | Ativada em PR após a primeira produção | Adiciona coluna opcional `origem`, preservando preços e linhas |
+| [Primeira promoção](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39077694982) | 17/10, 16:05:07 | 17/10, 20:09:25 | 4 h 04 min 18 s |
+| [Migration 3](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39079320715) | 17/10, 20:30:52 | 17/10, 20:34:24 | 3 min 32 s |
 
-A migration `0003` foi ativada após o [primeiro deploy automatizado em produção](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39077694982) e a [demonstração de rollback](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39078078308). A Release v1.0.0 permanece como versão inicial, sem a terceira migration.
+A primeira entrega inclui o tempo de preparação da infraestrutura e aprovação, explicando seu lead time maior. Não é uma medição apenas do tempo de execução do CI. O [rollback verificado](https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39078078308) foi um exercício controlado sobre uma versão saudável: **64 s é o tempo observado do exercício, não uma alegação de MTTR de incidente real**. Não houve início de indisponibilidade registrado; a recuperação de falha produtiva real permanece sem amostra.
 
-O PR adiciona `origem` ao modelo e à resposta da API, com padrão `Não informada`. O teste de evolução executa `0001`/`0002`, insere um registro adicional, captura IDs/nomes/preços, aplica `0003` e compara os dados anteriores. Também verifica o padrão em novas inserções e a execução repetida de `upgrade head`. Localmente usa SQLite descartável; no CI cria um banco PostgreSQL exclusivo para o teste e o remove ao terminar.
+O [registro de incidentes](docs/incident-register.json) explicita essa classificação. Dois workflows CD verdes foram excluídos da frequência porque tinham produção desabilitada: build concluído não significa deploy concluído. O script consulta os jobs e conta somente produção efetivamente verificada. A taxa de falha se limita ao registro deste projeto e não representa garantia estatística de ausência de falhas. A amostra pequena não permite classificar maturidade.
 
-A aplicação aplica `alembic upgrade head` antes de iniciar. Após o merge, validar `/cafes` em staging e confirmar que os registros anteriores mantêm IDs, nomes e preços, agora com `origem`. Somente então aprovar produção e repetir a comparação. O sucesso ponta a ponta deve ser registrado após essa execução.
-
-**Expandir e contrair:** a mudança primeiro **expande** o esquema com coluna opcional e padrão, sem excluir a coluna existente e sem alterar os dados de `nome`/`preco`. Uma mudança futura de remoção/contração exigiria período de compatibilidade e migração dos dados. O rollback de aplicação **não executa `alembic downgrade`**.
-
-**Bancos:** `staging` e `production` devem apontar para bancos separados. O workflow de CI tem um terceiro banco descartável. A credencial `cafe:cafe` do Compose serve **apenas para demonstração local**.
-
-## 5. Infraestrutura e ambientes
-
-- `Dockerfile` multi-stage, Python 3.12 e usuário não-root.
-- `docker-compose.yml`: ambiente local. `compose.nas.yml`: imagem GHCR por digest, banco persistente e portas locais 8001/8002.
-- TrueNAS SCALE: dois apps separados, `cafe-staging` e `cafe-production`, com PostgreSQL, credenciais e volumes distintos.
-- `deploy/truenas-quick.yml`: modelo para instalar cada app pela interface TrueNAS com hostname gratuito temporário do Cloudflare.
-
-**Ativação:** [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md). CD promove o digest do build para `:staging`, verifica a versão pública, solicita aprovação e promove o mesmo digest para `:production`. Watchtower aplica as tags em instâncias com escopos separados. `WATCHTOWER_ENABLED=true` habilita a promoção; até a instalação no NAS e uma execução completa, não há evidência ponta a ponta. A imagem usa nome minúsculo: `ghcr.io/grperes/sistematizacaoentrega`.
-
-No GitHub, exigir PR e check `qualidade` na main; criar Environments `staging` e `production`, configurar a variável `APP_URL` de cada ambiente e exigir aprovação humana de produção. Esses requisitos devem ser comprovados com execuções reais antes da entrega. A imagem de produção deve usar o mesmo digest aprovado em staging.
-
-## 6. Dependências e segurança
-
-- Todas as dependências de topo têm versões fixadas.
-- `.github/dependabot.yml` abre PRs semanais para `pip`, `github-actions` e `docker`.
-- `pip-audit` roda no CI. Uma vulnerabilidade detectada **deve bloquear o fluxo**; resolva atualizando/avaliando a dependência em PR, não escondendo o erro.
-- Permissões por padrão `contents: read`; somente o job que publica no GHCR recebe `packages: write`.
-- Senhas e tokens ficam em configuração privada; não copiar para issues, README ou Git.
-- **Evidência pendente:** link para um PR real do Dependabot tratado (mesclado com CI verde ou fechado com justificativa).
-
-## 7. Gerência de releases, rollback e Game Day
-
-### Release v1.0.0
-
-Depois de concluir o primeiro deploy e confirmar `/version`:
+Reproduzir a coleta atual, mantendo a fotografia original intacta:
 
 ```bash
-git switch main
-git pull
-git tag -a v1.0.0 -m "Primeira versão estável da Café com Deploy"
-git push origin v1.0.0
+python scripts/dora.py GRPeres/SistematizacaoEntrega --output metricas-atualizadas.json
 ```
 
-No GitHub, entre em **Releases > Draft a new release**, escolha `v1.0.0` e publique notas geradas. Não é suficiente apenas criar a tag: registre uma Release visível.
+A definição de recuperação após falha produtiva e a distinção de falhas de mudança seguem [DORA](https://dora.dev/guides/dora-metrics/). O trabalho apresenta os quatro indicadores solicitados pelo enunciado.
 
-### Rollback
+## 6. Reflexão: entrega contínua ou implantação contínua?
 
-Em **Actions > rollback > Run workflow**, informe o **SHA curto de sete caracteres** de uma imagem anteriormente estável (disponível em GHCR ou em uma execução anterior do CD). O job de produção precisa de aprovação. Registre o momento da falha, da decisão de rollback e da confirmação de `/health` e `/version` para calcular a recuperação. Não execute rollback em migrações destrutivas.
+A Café com Deploy deve manter **entrega contínua com aprovação manual em produção** nesta etapa. A imagem já fica pronta e validada em staging, mas o histórico observado é curto e a aprovação permite conferir impacto, dados e compatibilidade de migrations antes da promoção. O ganho principal foi substituir passos improvisados por um processo repetível e rastreável, com feedback rápido e recuperação demonstrada. Implantação contínua sem aprovação pode ser considerada depois de acumular evidências de estabilidade, observabilidade e reversão compatível com a evolução do banco. A aprovação não substitui testes; complementa a decisão de liberar uma mudança que já passou pelos gates.
 
-### Roteiro do vídeo Game Day (até 6 minutos)
+## 7. Integrante, papéis e contribuição individual
 
-1. **Abertura:** apresentem equipe/papéis e `GET /version` em produção.
-2. **Erro barrado:** PR com desconto 80% aceito; mostrem CI vermelho e merge bloqueado.
-3. **Correção:** voltem o limite a 50%; CI verde, PR aprovada e merge.
-4. **Viagem:** CD com build, staging, smoke tests, pedido de aprovação e produção com novo SHA.
-5. **Rollback:** executem o workflow manual com SHA anterior; mostrem `/version` voltando e cronometrem a recuperação.
-6. **Lições:** relatem DORA a partir do próprio histórico e a principal melhoria percebida.
-
-**Evidência final:** vídeo público ou não listado com acesso liberado e link de cada integrante.
-
-## 8. Métricas DORA e reflexão (Relatório de Voo)
-
-**Não invente indicadores.** Preencha após as execuções reais, mostrando links de workflows e horários.
-
-| Indicador | Valor real a inserir | Como coletar |
-|---|---|---|
-| Frequência de deploy | `PREENCHER` produção / intervalo | `cd.yml` concluído com sucesso até `production` |
-| Lead time médio de mudanças | `PREENCHER` horas | instante do commit → deploy produtivo concluído |
-| Taxa de falha de mudanças | `PREENCHER` % | deploys produtivos que causaram incidente/rollback ÷ deploys produtivos × 100 |
-| Tempo de recuperação | `PREENCHER` minutos | detecção da falha → `GET /health` e `/version` restaurados |
-
-O script `python scripts/dora.py USUARIO/REPO` lê histórico real de execuções no GitHub para auxiliar na contagem de deploys e lead time. Ele **não** inventa taxa de falha ou tempo de recuperação, que exigem registro do incidente. Faça as contas do vídeo com os timestamps reais.
-
-**Reflexão proposta:** nesta fase, a Café com Deploy **deve manter a aprovação manual em produção**. Embora os testes e as verificações automáticas reduzam risco, ainda é uma equipe aprendendo a garantir observabilidade, segurança de migrações e rollback testado. A implantação contínua sem aprovação pode ser avaliada após histórico de releases estáveis, monitoramento contínuo e incidentes controlados. A automação deve reduzir risco, não remover responsabilidade.
-
-### Integrantes e papéis
-
-| Nome | Matrícula | GitHub | Papel rotativo | Link de PR/commit de autoria |
+| Nome / equipe | Matrícula | GitHub | Papéis acumulados | Evidências de autoria |
 |---|---|---|---|---|
-| `PREENCHER` | `PREENCHER` | `PREENCHER` | Release Manager / Dev / QA / DBA | `PREENCHER` |
+| Gabriel Ribeiro Peres | 82602166 | [GRPeres](https://github.com/GRPeres) | Desenvolvimento, Release Manager, testes, plataforma, DBA e documentação | [PR #11](https://github.com/GRPeres/SistematizacaoEntrega/pull/11), [PR #12](https://github.com/GRPeres/SistematizacaoEntrega/pull/12), [PR #13](https://github.com/GRPeres/SistematizacaoEntrega/pull/13) |
 
-## Checklist final para cada integrante
+Minha contribuição foi preparar e publicar o projeto, configurar staging e produção no meu TrueNAS SCALE, validar o pipeline com aprovação e rollback e registrar as evidências. A escolha por Actions, GHCR e Watchtower permitiu promover a mesma imagem e atualizar a aplicação sem disponibilizar uma interface pública de administração do NAS. Também acompanhei a evolução do banco sem perda dos registros anteriores, a revisão de dependências e a demonstração de uma alteração inválida bloqueada pelo CI.
 
-- [ ] Repositório público com PR obrigatório e histórico de CI vermelho/verde.
-- [ ] Pelo menos 8 testes em 2 camadas, cobertura ≥70% e CI PostgreSQL verde.
-- [ ] GHCR com imagem pública, SHA/digest e duas implantações **reais**.
-- [ ] `staging` e `production` respondem em `/health` e `/version`.
-- [ ] Aprovação manual registrada no histórico do CD.
-- [ ] Rollback real executado, verificado e cronometrado.
-- [ ] 3 migrations aplicadas **na ordem temporal exigida**.
-- [ ] Um PR do Dependabot analisado pela equipe.
-- [ ] Tag + Release `v1.0.0` publicadas.
-- [ ] README preenchido com indicadores DORA **reais**, links e autores.
-- [ ] Vídeo Game Day gravado com roteiro e acesso liberado.
-- [ ] Cada integrante envia **seu próprio PDF** `sistematizacao-iec-<equipe>.pdf` no AVA, com sua contribuição e link de commit/PR.
+## Dependabot: decisão de revisão registrada
 
-## Referências do enunciado
+O [PR #1](https://github.com/GRPeres/SistematizacaoEntrega/pull/1) propôs trocar Python 3.12 por 3.14 no Dockerfile. O CI estava verde, mas continuava em Python 3.12 e não validava a imagem proposta. A atualização foi **fechada após revisão**, com [justificativa técnica no próprio PR](https://github.com/GRPeres/SistematizacaoEntrega/pull/1#issuecomment-6243170481): manter paridade nesta entrega e tratar a atualização de runtime em mudança própria, incluindo CI e validação do container. Dependabot permanece ativo. Isso demonstra avaliação da atualização, não aprovação automática de qualquer PR verde.
 
-- HUMBLE, J.; FARLEY, D. *Entrega contínua: como entregar software de forma rápida e confiável*. Bookman, 2014.
+## Operação e reprodução
+
+- [Configuração Watchtower e promoção](WATCHTOWER-SETUP.md); [implantação inicial TrueNAS](NAS-SETUP.md).
+- Python 3.12 no CI e Docker; Dockerfile multi-stage e usuário não-root.
+- Dependências de topo fixadas; pip-audit em cada PR. Permissões de escrita no GHCR somente nos jobs que publicam/promovem imagens.
+- Bancos separados por app/ambiente; senhas ficam na configuração privada do NAS. Não publicar YAML preenchido com credenciais.
+- Em `/cafes`, `/cafes/{id}` e `/cafes/{id}/preco?desconto=10`, a API permite consultar catálogo, item e preço com desconto; `POST /cafes` cria um item, validando preço e duplicidade.
+
+```bash
+# Ambiente local: API, PostgreSQL e migrations até 0003
+ docker compose up --build
+# Testes locais após criar/ativar um ambiente virtual
+ python -m pip install -r requirements-dev.txt
+ pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+ ruff check .
+```
+
+Na configuração instalada do NAS, Watchtower consulta os canais a cada 30 segundos. Após cada merge corrigido na main, acompanhe Actions; aprove produção somente após staging passar. Para rollback, use um SHA estável compatível com as migrations já aplicadas. Se um CD estiver esperando aprovação, cancele-o antes de um rollback urgente para liberar o grupo de concorrência.
+
+## Evidências concluídas e entrega pessoal
+
+- [x] Repositório público, main protegida e PRs com histórico vermelho/verde.
+- [x] CI com PostgreSQL, testes significativos e cobertura superior a 70%.
+- [x] Imagem GHCR, promoção do mesmo digest, aprovação e dois ambientes online.
+- [x] Rollback executado e verificado no exercício anterior à migration 3.
+- [x] Três migrations aplicadas, com comparação dos dados reais.
+- [x] PR Dependabot revisado e fechado com justificativa.
+- [x] Release v1.0.0 e Relatório de Voo com métricas rastreáveis.
+- [ ] Vídeo Game Day: ainda não gravado; não há link nesta revisão.
+- [ ] PDF individual no AVA: envio deve ser feito pelo integrante.
+
+## Referências
+
+- HUMBLE, J.; FARLEY, D. *Entrega contínua*. Bookman, 2014.
 - FORSGREN, N.; HUMBLE, J.; KIM, G. *Accelerate*. IT Revolution, 2018.
 - KIM, G. et al. *Manual de DevOps*. Alta Books, 2018.
 - [Twelve-Factor App](https://12factor.net/pt_br/).
-- [Documentação GitHub Actions](https://docs.github.com/pt/actions).
-- [DORA Software Delivery Metrics](https://dora.dev/).
-
-
-
-
-
+- [GitHub Actions](https://docs.github.com/pt/actions).
+- [Watchtower: scopes](https://containrrr.dev/watchtower/running-multiple-instances/).
+- [DORA: métricas de entrega](https://dora.dev/guides/dora-metrics/).

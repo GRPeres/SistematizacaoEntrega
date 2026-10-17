@@ -78,7 +78,7 @@ workflows, mas não desfaz uma tag que já foi publicada.
 ## 6. Demonstrar rollback
 
 Abra **Actions → rollback → Run workflow → main**, informe o SHA anterior
-(`abc12a0` é a baseline inicial), aprove produção e observe `/version` retornar
+(`00718a2` contém a migration 0003 e é um alvo estável compatível após essa evolução), aprove produção e observe `/version` retornar
 ao SHA antigo. O workflow resolve o digest publicado, move somente `:production`
 e verifica a recuperação. O banco e as migrations permanecem.
 
@@ -92,3 +92,4 @@ validada ponta a ponta após observar os dois ambientes atualizarem pelo Watchto
 
 Fontes: [Watchtower scopes](https://containrrr.dev/watchtower/running-multiple-instances/),
 [promoção preservando manifesto](https://docs.docker.com/reference/cli/docker/buildx/imagetools/create/).
+

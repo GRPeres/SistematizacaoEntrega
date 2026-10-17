@@ -8,7 +8,7 @@ Imagem: `ghcr.io/grperes/sistematizacaoentrega`
 O código está publicado. O workflow CD valida e publica a imagem no GHCR.
 **Para ativar a automação, siga [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md).**
 Os workflows agora usam tags de canal e Watchtower. O roteiro abaixo descreve
-a implantação manual inicial; a validação ponta a ponta da automação está pendente.
+a implantação manual inicial. A automação foi validada nos deploys registrados no README.
 
 ## Interface TrueNAS
 
@@ -88,4 +88,5 @@ Fontes: [TrueNAS Custom Apps](https://apps.truenas.com/managing-apps/installing-
 - As variáveis `APP_URL` foram registradas nos GitHub Environments correspondentes.
 - Esta verificação comprova disponibilidade e versão, mas não confirma isolamento
   dos volumes/bancos nem execução automatizada do deploy pelo GitHub Actions.
+
 

@@ -1,0 +1,51 @@
+{
+  "repository": "GRPeres/SistematizacaoEntrega",
+  "collected_at_utc": "2026-10-17T23:39:22.497922+00:00",
+  "method": "Successful production job; commit committer time to smoke completion",
+  "production_deployments": [
+    {
+      "run_id": 39077694982,
+      "url": "https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39077694982",
+      "sha": "37f863bfc3c5fd8428f6be3a16bdc6f0f9d8b3e6",
+      "commit_time_utc": "2026-10-17T19:05:07Z",
+      "verified_time_utc": "2026-10-17T23:09:25Z",
+      "lead_seconds": 14658.0
+    },
+    {
+      "run_id": 39079320715,
+      "url": "https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39079320715",
+      "sha": "00718a2d6799ff580a808ccc464c80b62c745d86",
+      "commit_time_utc": "2026-10-17T23:30:52Z",
+      "verified_time_utc": "2026-10-17T23:34:24Z",
+      "lead_seconds": 212.0
+    }
+  ],
+  "deployment_count": 2,
+  "mean_lead_seconds": 7435.0,
+  "excluded_cd_runs": [
+    {
+      "run_id": 39060915817,
+      "url": "https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39060915817",
+      "reason": "No successful production deployment job"
+    },
+    {
+      "run_id": 39058727903,
+      "url": "https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39058727903",
+      "reason": "No successful production deployment job"
+    }
+  ],
+  "rollback_drills": [
+    {
+      "run_id": 39078078308,
+      "url": "https://github.com/GRPeres/SistematizacaoEntrega/actions/runs/39078078308",
+      "requested_at_utc": "2026-10-17T23:11:52Z",
+      "verified_at_utc": "2026-10-17T23:12:56Z",
+      "request_to_verified_seconds": 64.0,
+      "classification": "rollback exercise, not a recorded production incident"
+    }
+  ],
+  "registered_production_incidents": 0,
+  "change_failure_rate_percent": 0.0,
+  "failed_deployment_recovery_time": null,
+  "incident_note": "Based on docs/incident-register.json; never infer incidents from rollback count"
+}
