@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cafe
+      POSTGRES_PASSWORD: cafe
+      POSTGRES_DB: cafe
+    ports:
+      - "5432:5432"
+    volumes:
+      - cafe_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cafe -d cafe"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  api:
+    build:
+      context: .
+      args:
+        APP_VERSION: local
+    environment:
+      DATABASE_URL: postgresql+psycopg://cafe:cafe@db:5432/cafe
+      DESCONTO_MAXIMO: 50
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  cafe_pgdata:

@@ -1,0 +1,2 @@
+Alembic migrations: 0001 cria a tabela e 0002 insere o cardápio.
+A migration 0003 fica em extras/migration3 até a primeira implantação em produção.

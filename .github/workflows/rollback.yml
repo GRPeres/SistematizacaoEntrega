@@ -1,0 +1,44 @@
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "SHA de 7 hexadecimais da última versão estável"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: reimplantar-versao-estavel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Validar SHA e acionar rollback
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          if ! [[ "$TAG" =~ ^[a-f0-9]{7}$ ]]; then
+            echo "TAG inválida - informe SHA curto hexadecimal"; exit 1
+          fi
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:$TAG"
+          curl --retry 3 -fsS -G "$HOOK" --data-urlencode "imgURL=$IMAGE"
+      - name: Validar recuperação do serviço e SHA antigo
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 20 "$APP_URL/health" | grep -Fq '"ok"' \
+              && curl -fsS --max-time 20 "$APP_URL/version" | grep -Fq "$TAG"; then
+              echo "Rollback verificado: $TAG"; exit 0
+            fi
+            sleep 15
+          done
+          echo "Rollback não validado"; exit 1

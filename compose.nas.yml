@@ -1,0 +1,30 @@
+# Use a different project name and env file for each environment.
+# docker compose --env-file .env.staging -p cafe-staging -f compose.nas.yml up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cafe
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment file}
+      POSTGRES_DB: cafe
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U cafe -d cafe"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    image: ${APP_IMAGE:?Set APP_IMAGE to the GHCR image digest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://cafe:${DB_PASSWORD:?Set DB_PASSWORD}@db:5432/cafe
+      DESCONTO_MAXIMO: "50"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:?Set APP_PORT}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  pgdata:
