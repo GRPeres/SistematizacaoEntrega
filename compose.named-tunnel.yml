@@ -1,0 +1,11 @@
+# Add to compose.nas.yml for a stable hostname on your Cloudflare domain.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: [tunnel, --no-autoupdate, run]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set a NEW tunnel token in the NAS environment file}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy

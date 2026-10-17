@@ -1,15 +1,15 @@
 # ☕ Café com Deploy — CI/CD sem medo da sexta-feira
 
 > **Projeto acadêmico — Pós-graduação CEUB, Integração e Entrega Contínuas.**
-> Este repositório é um **ponto de partida implementado**, ainda não publicado/implantado.
-> Substitua os campos `SEU_USUARIO`, `NOME_DA_EQUIPE` e `PREENCHER` depois de executar as etapas reais.
+> Este repositório contém a implementação e a preparação de infraestrutura. Resultados de implantação só serão registrados após execução real.
+> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). O build no GHCR funciona independentemente do deploy; as etapas antigas do Render ficam desabilitadas. URLs, aprovação e automação do NAS ainda estão pendentes.
 
-![CI](https://github.com/SEU_USUARIO/cafe-com-deploy-NOME_DA_EQUIPE/actions/workflows/ci.yml/badge.svg)
-![CD](https://github.com/SEU_USUARIO/cafe-com-deploy-NOME_DA_EQUIPE/actions/workflows/cd.yml/badge.svg)
+![CI](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/ci.yml/badge.svg)
+![CD](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/cd.yml/badge.svg)
 
 | Item | Link |
 |---|---|
-| Repositório público | `https://github.com/SEU_USUARIO/cafe-com-deploy-NOME_DA_EQUIPE` |
+| Repositório público | `https://github.com/GRPeres/SistematizacaoEntrega` |
 | Staging | **PREENCHER:** `https://...onrender.com` |
 | Produção | **PREENCHER:** `https://...onrender.com` |
 | Release v1.0.0 | **PREENCHER:** `https://github.com/.../releases/tag/v1.0.0` |
@@ -138,7 +138,7 @@ git push -u origin feat/origem-cafe
 - `Dockerfile` multi-stage (`deps`/`runtime`), Python 3.12, usuário não-root `appuser`, endpoint health e variável `PORT`.
 - `docker-compose.yml` inicia Postgres 16 local, com persistência e healthcheck.
 - Repositório público e imagem pública no GHCR (necessário se o Render acessa a imagem sem autenticação).
-- Render `staging`: serviço a partir de **Existing Image**, apontado para `ghcr.io/SEU_USUARIO/cafe-com-deploy-NOME_DA_EQUIPE:<SHA>` + banco próprio.
+- Render `staging`: serviço a partir de **Existing Image**, apontado para `ghcr.io/GRPeres/SistematizacaoEntrega:<SHA>` + banco próprio.
 - Render `production`: outro serviço **Existing Image**, mesmo pacote, banco próprio.
 
 ### Configuração manual obrigatória (pelo titular das contas)
@@ -239,3 +239,4 @@ O script `python scripts/dora.py USUARIO/REPO` lê histórico real de execuçõe
 - [Twelve-Factor App](https://12factor.net/pt_br/).
 - [Documentação GitHub Actions](https://docs.github.com/pt/actions).
 - [DORA Software Delivery Metrics](https://dora.dev/).
+

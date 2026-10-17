@@ -62,6 +62,8 @@ jobs:
 
   staging:
     name: implantar-staging
+    # Disabled during the migration to TrueNAS; do not invoke obsolete hooks.
+    if: ${{ vars.DEPLOY_TARGET == 'render' }}
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -89,6 +91,7 @@ jobs:
 
   production:
     name: aprovar-e-implantar-producao
+    if: ${{ vars.DEPLOY_TARGET == 'render' }}
     needs: [build, staging]
     runs-on: ubuntu-latest
     timeout-minutes: 20
