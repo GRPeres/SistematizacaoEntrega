@@ -2,7 +2,7 @@
 
 > **Projeto acadêmico — Pós-graduação CEUB, Integração e Entrega Contínuas.**
 > Este repositório contém a implementação e a preparação de infraestrutura. Resultados de implantação só serão registrados após execução real.
-> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). O build no GHCR funciona independentemente do deploy; as etapas antigas do Render ficam desabilitadas. Staging e produção foram implantados manualmente no NAS e verificados em 17/10/2026. A automação de deploy e rollback no NAS ainda está pendente.
+> **Destino escolhido: TrueNAS SCALE.** Consulte [NAS-SETUP.md](NAS-SETUP.md). Staging e produção foram verificados em 17/10/2026. O pipeline Watchtower está implementado; sua ativação e validação ponta a ponta seguem [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md).
 
 ![CI](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/ci.yml/badge.svg)
 ![CD](https://github.com/GRPeres/SistematizacaoEntrega/actions/workflows/cd.yml/badge.svg)
@@ -102,8 +102,8 @@ Princípios aplicados: automação, feedback rápido, rastreabilidade do commit 
 
 A pirâmide tem **testes unitários** da regra `preco_com_desconto`, **testes de integração** API + banco SQLAlchemy (Postgres no Actions; SQLite em memória local) e **smoke tests** de `/health` e `/version` após cada deploy.
 
-- **Quantidade preparada:** 23 testes coletados localmente (12 unitários parametrizados e 11 testes de API; alguns testes de API cobrem dois endpoints).
-- **Evidência local inicial:** 23 passaram e 96% de cobertura. Esse resultado não comprova o comportamento do PostgreSQL remoto.
+- **Quantidade preparada:** 28 testes coletados localmente (12 de regras, 11 de API e 5 do gate de implantação).
+- **Evidência local inicial:** 28 passaram e 96% de cobertura da aplicação. Esse resultado não comprova o comportamento do PostgreSQL remoto.
 - **Quality gate:** `pytest --cov=app --cov-fail-under=70`, lint Ruff e auditoria `pip-audit -r requirements.txt` em cada PR.
 - **Evidência final a preencher:** link do Actions CI com testes PostgreSQL verdes + relatório de cobertura no próprio log.
 
@@ -140,7 +140,7 @@ git push -u origin feat/origem-cafe
 - TrueNAS SCALE: dois apps separados, `cafe-staging` e `cafe-production`, com PostgreSQL, credenciais e volumes distintos.
 - `deploy/truenas-quick.yml`: modelo para instalar cada app pela interface TrueNAS com hostname gratuito temporário do Cloudflare.
 
-**Instruções:** [NAS-SETUP.md](NAS-SETUP.md). As etapas Render foram desabilitadas; a automação do NAS ainda não foi executada. O build/GHCR continua independente do deploy. A imagem usa nome minúsculo: `ghcr.io/grperes/sistematizacaoentrega`.
+**Ativação:** [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md). CD promove o digest do build para `:staging`, verifica a versão pública, solicita aprovação e promove o mesmo digest para `:production`. Watchtower aplica as tags em instâncias com escopos separados. `WATCHTOWER_ENABLED=true` habilita a promoção; até a instalação no NAS e uma execução completa, não há evidência ponta a ponta. A imagem usa nome minúsculo: `ghcr.io/grperes/sistematizacaoentrega`.
 
 No GitHub, exigir PR e check `qualidade` na main; criar Environments `staging` e `production`, configurar a variável `APP_URL` de cada ambiente e exigir aprovação humana de produção. Esses requisitos devem ser comprovados com execuções reais antes da entrega. A imagem de produção deve usar o mesmo digest aprovado em staging.
 
@@ -227,6 +227,7 @@ O script `python scripts/dora.py USUARIO/REPO` lê histórico real de execuçõe
 - [Twelve-Factor App](https://12factor.net/pt_br/).
 - [Documentação GitHub Actions](https://docs.github.com/pt/actions).
 - [DORA Software Delivery Metrics](https://dora.dev/).
+
 
 
 

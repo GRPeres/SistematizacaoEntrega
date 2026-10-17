@@ -6,9 +6,9 @@ Imagem: `ghcr.io/grperes/sistematizacaoentrega`
 ## Estado atual
 
 O código está publicado. O workflow CD valida e publica a imagem no GHCR.
-As etapas antigas do Render estão desabilitadas. **Automação de deploy no NAS,
-aprovação e rollback pelo Actions ainda precisam ser configurados e executados.**
-Não ative `DEPLOY_TARGET=render` para este destino.
+**Para ativar a automação, siga [WATCHTOWER-SETUP.md](WATCHTOWER-SETUP.md).**
+Os workflows agora usam tags de canal e Watchtower. O roteiro abaixo descreve
+a implantação manual inicial; a validação ponta a ponta da automação está pendente.
 
 ## Interface TrueNAS
 
@@ -63,8 +63,8 @@ sobre os mesmos containers. Guarde arquivos privados com permissão restrita.
 ## Rollback e dados
 
 Restaure o digest anterior conhecido no app de produção, atualize e confirme
-`/health` e `/version`. Não reconstrua a imagem. Não use Watchtower nesta API:
-aprovação e rollback exigem versões explícitas. Migrations são executadas na
+`/health` e `/version`. Não reconstrua a imagem. No modo automático, Actions controla as tags de canal e a aprovação; Watchtower
+aplica a imagem. Consulte WATCHTOWER-SETUP.md. Migrations são executadas na
 inicialização; rollback da aplicação não desfaz migrations. Faça backup do banco
 antes de mudanças de esquema e nunca execute `down -v` nesses ambientes.
 A migration 0003 deve entrar somente após o primeiro deploy real de produção.
@@ -88,3 +88,4 @@ Fontes: [TrueNAS Custom Apps](https://apps.truenas.com/managing-apps/installing-
 - As variáveis `APP_URL` foram registradas nos GitHub Environments correspondentes.
 - Esta verificação comprova disponibilidade e versão, mas não confirma isolamento
   dos volumes/bancos nem execução automatizada do deploy pelo GitHub Actions.
+

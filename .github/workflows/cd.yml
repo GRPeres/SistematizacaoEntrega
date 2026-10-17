@@ -1,6 +1,7 @@
 name: cd
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -8,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cafe-deploy-${{ github.ref }}
+  group: cafe-environments
   cancel-in-progress: false
 
 jobs:
@@ -61,58 +62,26 @@ jobs:
         run: echo "image_ref=$NAME@$DIGEST" >> "$GITHUB_OUTPUT"
 
   staging:
-    name: implantar-staging
-    # Disabled during the migration to TrueNAS; do not invoke obsolete hooks.
-    if: ${{ vars.DEPLOY_TARGET == 'render' }}
+    if: ${{ vars.WATCHTOWER_ENABLED == 'true' && github.ref == 'refs/heads/main' }}
     needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: staging
-    steps:
-      - name: Acionar deploy do mesmo digest no Render
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-          IMAGE: ${{ needs.build.outputs.image_ref }}
-        run: curl --retry 3 --fail --silent --show-error -G "$HOOK" --data-urlencode "imgURL=$IMAGE"
-      - name: Smoke test /health e /version
-        env:
-          APP_URL: ${{ vars.APP_URL }}
-          EXPECTED_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          for i in $(seq 1 40); do
-            if curl -fsS --max-time 20 "$APP_URL/health" | grep -Fq '"ok"' \
-              && curl -fsS --max-time 20 "$APP_URL/version" | grep -Fq "$EXPECTED_SHA"; then
-              echo "Staging verificado com o SHA $EXPECTED_SHA"; exit 0
-            fi
-            sleep 15
-          done
-          echo "Staging não respondeu com a versão esperada"; exit 1
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/promote.yml
+    with:
+      environment_name: staging
+      image_ref: ${{ needs.build.outputs.image_ref }}
+      expected_sha: ${{ github.sha }}
 
   production:
-    name: aprovar-e-implantar-producao
-    if: ${{ vars.DEPLOY_TARGET == 'render' }}
+    if: ${{ vars.WATCHTOWER_ENABLED == 'true' && github.ref == 'refs/heads/main' }}
     needs: [build, staging]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: production
-    steps:
-      - name: Acionar deploy do MESMO digest testado em staging
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-          IMAGE: ${{ needs.build.outputs.image_ref }}
-        run: curl --retry 3 --fail --silent --show-error -G "$HOOK" --data-urlencode "imgURL=$IMAGE"
-      - name: Smoke test em produção
-        env:
-          APP_URL: ${{ vars.APP_URL }}
-          EXPECTED_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          for i in $(seq 1 40); do
-            if curl -fsS --max-time 20 "$APP_URL/health" | grep -Fq '"ok"' \
-              && curl -fsS --max-time 20 "$APP_URL/version" | grep -Fq "$EXPECTED_SHA"; then
-              echo "Produção verificada com o SHA $EXPECTED_SHA"; exit 0
-            fi
-            sleep 15
-          done
-          echo "Produção não respondeu com a versão esperada"; exit 1
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/promote.yml
+    with:
+      environment_name: production
+      image_ref: ${{ needs.build.outputs.image_ref }}
+      expected_sha: ${{ github.sha }}
+
